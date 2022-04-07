@@ -1,0 +1,1051 @@
+classdef FBG_App_2 < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        figure1                        matlab.ui.Figure
+        FileMenu_2                     matlab.ui.container.Menu
+        OpenMenu                       matlab.ui.container.Menu
+        OpenmultiplefoldersMenu        matlab.ui.container.Menu
+        CloseMenu                      matlab.ui.container.Menu
+        PrintPreviewMenu               matlab.ui.container.Menu
+        EditMenu                       matlab.ui.container.Menu
+        GenerateGraphMenu              matlab.ui.container.Menu
+        ClearTableMenu                 matlab.ui.container.Menu
+        ClearGraphMenu                 matlab.ui.container.Menu
+        AveragedatabyhourMenu          matlab.ui.container.Menu
+        AveragetemperaturebyhourMenu   matlab.ui.container.Menu
+        SametemperatureMenu            matlab.ui.container.Menu
+        GraphthesisMenu                matlab.ui.container.Menu
+        GraphpressureMenu              matlab.ui.container.Menu
+        WindowMenu                     matlab.ui.container.Menu
+        MaximizeMenu                   matlab.ui.container.Menu
+        MinimizeMenu                   matlab.ui.container.Menu
+        NumbofrowstodelEditField       matlab.ui.control.EditField
+        NumbofrowstodelEditFieldLabel  matlab.ui.control.Label
+        FilterrowsButton               matlab.ui.control.Button
+        FilterTimeExcelButton          matlab.ui.control.Button
+        UITable                        matlab.ui.control.Table
+        ExcelButton                    matlab.ui.control.Button
+        DateendEditField               matlab.ui.control.EditField
+        DateendEditFieldLabel          matlab.ui.control.Label
+        DatestartEditField             matlab.ui.control.EditField
+        DatestartEditFieldLabel        matlab.ui.control.Label
+        TimeendEditField               matlab.ui.control.EditField
+        TimeendEditFieldLabel          matlab.ui.control.Label
+        ColumnnumberEditField          matlab.ui.control.EditField
+        ColumnnumberLabel              matlab.ui.control.Label
+        DeleteButton                   matlab.ui.control.Button
+        FilterTimeButton               matlab.ui.control.Button
+        TimestartEditField             matlab.ui.control.EditField
+        TimestartEditFieldLabel        matlab.ui.control.Label
+        text5                          matlab.ui.control.Label
+        text4                          matlab.ui.control.Label
+        text3                          matlab.ui.control.Label
+        text2                          matlab.ui.control.Label
+        uitable1                       matlab.ui.control.Table
+        axes1                          matlab.ui.control.UIAxes
+    end
+
+    
+    methods (Access = private)
+        
+        %{
+        function [x, y] = selectDataPoints(~, ax)
+            roi = drawpoint(ax);
+            x = roi.Position(1);
+            y = roi.Position(2);
+        end
+        %}
+        
+        %{
+        function UIFigureWindowButtonDown(app, event)
+            temp = app.axes1.CurrentPoint; % Returns 2x3 array of points
+            loc = [temp(1,1) temp(1,2)]; % Gets the (x,y) coordinates
+        end
+        %}
+        
+        %{
+        function getMousePosition(app,source,event)
+    switch event.EventName
+        case 'Hit'
+            % Properties: Btn/IntersectionPoint/Src/Evnt
+            posData = event.IntersectionPoint; % to be used for calc
+        case 'MouseData'
+            % Properties: Src/EvntName
+        end
+        %}
+        
+        %{
+        function [x,y] = selectDatapoints(ax)
+    % Remove any pre-existing rectanlges (if any)
+    delete(findall(ax, 'Type',  'images.roi.Rectangle'))
+    
+    % Get coordinates of all data points in the axes
+    xyobj = findall(ax.Children, '-Property','xData'); 
+    xydata = get(xyobj, {'XData','YData'});
+    xydataMat = cell2mat(xydata'); 
+    
+    % change title of axes to instructions, in red
+    originalTitle = get(ax.Title, {'String', 'Color'}); 
+    set(ax.Title, 'String', 'Draw rectangle around desired datapoints', 'Color', 'r')
+    % allow user to draw rectangle; see more options:
+    % https://www.mathworks.com/help/images/ref/drawrectangle.html
+    pan(app.axes1, 'off') %turn off panning so the interaction doesn't drag the data.
+    roi = drawrectangle(ax); 
+    
+    % quit if figure is closed
+    if ~isvalid(roi)
+       x = []; 
+       y = []; 
+       return
+    end
+    
+    % Return original title
+    set(ax.Title, 'String', originalTitle{1}, 'Color', originalTitle{2})
+    
+    % determine which coordinates are within the ROI
+    isIn = xydataMat(1,:) >= roi.Position(1) & xydataMat(1,:) <= sum(roi.Position([1,3])) ...
+        & xydataMat(2,:) >= roi.Position(2) & xydataMat(2,:) <= sum(roi.Position([2,4])); 
+    
+    % Delete ROI
+    delete(roi)
+    
+    % Return outputs
+    x = xydataMat(1,isIn); 
+    y = xydataMat(2,isIn);    
+        end
+        %}
+        
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function FBG_OpeningFcn(app)
+            %             % This function has no output args, see OutputFcn.
+            %             % hObject    handle to figure
+            %             % eventdata  reserved - to be defined in a future version of MATLAB
+            %             % handles    structure with handles and user data (see GUIDATA)
+            %             % varargin   command line arguments to FBG (see VARARGIN)
+            %
+            %             % Choose default command line output for FBG
+            %             app.output = hObject;
+            %
+            %             % Update handles structure
+            %             guidata(hObject, handles);
+            movegui(app.figure1,"center"); %Center app window
+        end
+
+        % Menu selected function: OpenMenu
+        function OpenMenuSelected(app, event)
+            %Open file selection in dialog box
+            [filename,path] = uigetfile(...
+                {'*.csv', 'Text file CSV (*.csv)';...
+                '*.xls; *.xlsx', 'Microsoft Excel file (*.xls, *.xlsx)';...
+                '*.txt', 'Text document (*.txt)';...
+                '*.*', 'All files (*.*)'}, 'Load File', 'MultiSelect','on');
+            %Display text
+            if isequal(filename,0)
+                disp('User selected Cancel'); %Show message in Command Window
+                questdlg('No file appears to have been selected.',...
+                    'Debugger Error',...
+                    'OK', 'OK');
+                return;
+            else
+                disp(['User selected: ', fullfile(path,filename)]); %Show message in Command Window
+                set(app.text4, 'Text', path); %Show path in textbox
+                set(app.text5, 'Text', filename); %Show filenames in textbox
+                setappdata(0,'Text',filename); %Store filename in app.text
+            end
+            
+            switch(class(filename))
+                %c, 'MultipleDelimsAsOne', true, 'ReadVariableNames', true, 'Format', '%D%T%q%q%q%q%q%q%f%q', 'HeaderLines', 2);
+                case 'char' %One file is in char array
+                    onefile = readtable(fullfile(path,filename), 'Delimiter', ';'); %Read data from file
+                    header = {'time','current','avg','min','max','spc_temp', 'wlen_comp', 'led_power'};
+                    onefile.Properties.VariableNames = header; %Set VariableNames from header
+                    app.uitable1.ColumnName = onefile.Properties.VariableNames; %Set ColumnName in uitable from file
+                    app.uitable1.Data = onefile; %Show data in UItable
+                    %{
+                    %Shows only three columns in uitable
+                    T = [onefile(:,1) onefile(:,2) onefile(:,3)];
+                    header = {'time','current','avg'};
+                    T.Properties.VariableNames = header;
+                    app.uitable1.ColumnName = T.Properties.VariableNames;
+                    app.uitable1.Data = T; %Show data in UItable
+                    %}
+                    setappdata(0,'figure',0); %Store counting in figure
+                    setappdata(app.uitable1,'Data',onefile); %Store data from table in a UItable1
+                    
+                case 'cell' %Multipledata are in cell array
+                    x = {}; %Initialization
+                    for i = 1:length(filename)
+                        data = readtable(fullfile(path,filename{i}), 'Delimiter', ';'); %Read data from file
+                        %Set header name in uitable
+                        header = {'time','current','avg','min','max','spc_temp', 'wlen_comp', 'led_power'};
+                        data.Properties.VariableNames = header; %Set VariableNames from header
+                        app.uitable1.ColumnName = data.Properties.VariableNames; %Set ColumnName in uitable
+                        x{i} = data;
+                        n = length(x); %Count how many files was opened
+                        table = vertcat(x{:}); %Concatenate arrays vertically
+                        %{
+                        %Shows only three columns in uitable
+                        T = [table(:,1) table(:,2) table(:,3)];
+                        app.uitable1.Data = T; %Show data in UItable
+                        %}
+                        app.uitable1.Data = table; %Show data in UItable
+                        setappdata(0,'figure',n); %Store counting in figure
+                        setappdata(app.uitable1,'Data',x); %Store data from table in a UItable1
+                    end %End and repeat for all files
+            end
+        end
+
+        % Menu selected function: OpenmultiplefoldersMenu
+        function OpenmultiplefoldersMenuSelected(app, event)
+            folder = uigetdir(); %Open file selection in dialog box
+            if folder == 0
+                folder = [];
+                disp('User selected Cancel'); %Show message in Command Window
+                questdlg('No file appears to have been selected.',...
+                    'Debugger Error',...
+                    'OK', 'OK');
+                return;
+            else
+                %Generates structure that contains csv files within current folder and subfolders
+                path = dir(fullfile(folder, '**/*.csv')); %Struct array with fields
+                ListFolders = {path.folder}'; %List of folders with all files
+                ListUniFolders = unique(ListFolders); %List unique name of folders
+                counter = 0; %Initialization
+                for i = 1:length(ListUniFolders)
+                    dirPath = sprintf('%s/*.csv', ListUniFolders{counter+i,1}); % Folder path that changes in loop
+                    filesSepFolder = dir(dirPath); %Struct array with files from current folder
+                    for j = 1:length(filesSepFolder)
+                        %If I want complete path => filesSepFolder(counter+j,1).folder, '\',
+                        analysedFile = [filesSepFolder(counter+j,1).folder, '/', filesSepFolder(counter+j,1).name]; %Gives a path of a single file
+                        allFiles(j) = {analysedFile}; %All files from current folder
+                    end
+                    allInFolder(i) = {allFiles}; %All files in cell array
+                end
+                filename = cat(2, allInFolder{:}); %Concatenate array into one for example 1x180 cell array
+                %Display text
+                disp(['User selected: ', filename]); %Show message in Command Window
+                setappdata(0,'Text',filename); %Store filename in app.text
+                
+                x = {}; %Initialization
+                for i = 1:length(filename)
+                    data = readtable(filename{i}, 'Delimiter', ';'); %Read data from file
+                    %Set header name in uitable
+                    header = {'time','current','avg','min','max','spc_temp', 'wlen_comp', 'led_power'};
+                    data.Properties.VariableNames = header; %Set VariableNames from header
+                    app.uitable1.ColumnName = data.Properties.VariableNames; %Set ColumnName in uitable
+                    x{i} = data;
+                    n = length(x); %Count how many files was opened
+                    table = vertcat(x{:}); %Concatenate arrays vertically
+                    %%{
+                    %Shows only three columns in uitable
+                    T = [table(:,1) table(:,2) table(:,3)];
+                    app.uitable1.Data = T; %Show data in UItable
+                    %}
+                    app.uitable1.Data = table; %Show data in UItable
+                    setappdata(0,'figure',n); %Store counting in figure
+                    setappdata(app.uitable1,'Data',x); %Store data from table in a UItable1
+                end %End and repeat for all files
+            end
+        end
+
+        % Menu selected function: CloseMenu
+        function CloseMenuSelected(app, event)
+            selection = questdlg('Are you sure you want to exit?',...
+                'Exit',...
+                'Yes','No','Yes'); %Question box for exit app
+            if strcmp(selection,'No')
+                return;
+            end
+            delete(app.figure1); %Delete figure
+        end
+
+        % Menu selected function: GenerateGraphMenu
+        function GenerateGraphMenuSelected(app, event)
+            %T = getappdata(0, 'table') %Get data from a UI, data have cell array format
+            nFiles = getappdata(0,'figure'); %Get number of files from figure
+            filename = getappdata(0, 'Text'); %Take filename for set legend
+            tableData = app.uitable1.Data; %Read actual data from table, data have table format
+            T = getappdata(app.uitable1,'Data');
+            Excel = app.UITable.Data;
+            
+            %Line color
+            %'#0072BD' blue, '#D95319' orange, '#EDB120' yellow, '#7E2F8E' violet,
+            %'#77AC30' green, '#4DBEEE' blue, '#A2142F' red
+            %cla(app.axes1, 'reset'); %Clear graph before plot something new
+            app.axes1.Title.String = 'FBG sensor'; %Set title of graph
+            app.axes1.XLabel.String = 'Date time'; %Set xAxis name
+            app.axes1.XGrid = 'on'; %Set xGrid
+            app.axes1.XMinorGrid = 'on'; %Set finer xGrid
+            app.axes1.YGrid = 'on'; %Set yGrid
+            app.axes1.YMinorGrid = 'on'; %Set finer yGrid
+            
+            if(nFiles>0) %Condition if is selected more files then 1
+                
+                for j = 1:nFiles
+                    FileName = cell2mat(filename(j)); %Convert from cell array where is a char, now is only char
+                    [~,fileName,~] = fileparts(FileName); %Take away file extension
+                    filename{1,j} = fileName; %Store data in cell array
+                end
+                legendTitle1 = filename{1,1}(1:end); %Read first cell array till end
+                legendTitle2 = filename{1,2}(1:end); %Read second cell array till end
+                
+                hold on; %Hold the plot
+                for ii=1:nFiles
+                    
+                    table = vertcat(T{ii});
+                    table.time = datetime(table.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                    TT = table2timetable(table); %Convert table to timetable
+                    yyaxis(app.axes1, 'left'); %Set yAxis on the left side
+                    app.axes1.YLabel.String = '\Delta\mu\epsilon(\mum/m)'; %Set yAxis name on the left side
+                    %ylim(app.axes1, [-100 400]) %Set yAxis limit on the left side
+                    app.axes1.YColor = '#D95319'; %Set yData color on the left side
+                    plot(app.axes1,TT.time,TT.current); %Plot data
+                    
+                    yyaxis(app.axes1, 'right'); %Set yAxis on the right side
+                    app.axes1.YLabel.String = '\Deltat(°C)'; %Set yAxis name on the right side
+                    ylim(app.axes1, [10 30]); %Set yAxis limit on the right side
+                    app.axes1.YColor = '#0072BD'; %Set yData color on the right side
+                    plot(app.axes1,Excel.DATE_,Excel.M01__C); %Plot data
+                    legend(app.axes1,{legendTitle1,legendTitle2,'Temperature'}, 'Location', 'best'); %Set legend name
+                    
+                end %End and repeat for all files
+                %hold off;
+            else
+                [~,legendTitle,~] = fileparts(filename); %Take away file extension
+                tableData.time = datetime(tableData.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                TT = table2timetable(tableData); %Convert table to timetable
+                yyaxis(app.axes1, 'left'); %Set yAxis on the left side
+                app.axes1.YLabel.String = '\Delta\mu\epsilon(\mum/m)'; %Set yAxis name on the left side
+                %ylim(app.axes1, [-100 100]) %Set yAxis limit on the left side
+                app.axes1.YColor = '#D95319'; %Set yData color on the left side
+                app.axes1.LineStyleOrder = '-'; %Set type of line for data on the left side
+                plot(app.axes1,TT.time,TT.current,'Color','#D95319'); %Plot data
+                
+                yyaxis(app.axes1, 'right'); %Set yAxis on the right side
+                app.axes1.YLabel.String = '\Deltat(°C)'; %Set yAxis name on the right side
+                ylim(app.axes1, [10 30]) %Set yAxis limit on the right side
+                app.axes1.YColor = '#0072BD'; %Set yData color on the right side
+                app.axes1.LineStyleOrder = '--'; %Set type of line for data on the right side
+                plot(app.axes1,Excel.DATE_,Excel.M01__C, 'Color', '#0072BD'); %Plot data
+                legend(app.axes1,{legendTitle,'Temperature'}, 'Location', 'best') %Set legend name
+                
+                
+                % Using mouse in graph
+                %[TT.time, TT.current, Excel.M01_C]=ginput(2)
+                %[x, y] = selectDataPoints(app, app.axes1);
+                %app.axes1.ButtonDownFcn = createCallbackFcn(app, @app.getMousePosition, true);
+                %[x,y] = selectDatapoints(app.axes1);
+            end
+            brush on;
+        end
+
+        % Menu selected function: ClearTableMenu
+        function ClearTableMenuSelected(app, event)
+            set(app.uitable1, 'ColumnName', {}); %Clear ColumnName from uitable
+            set(app.uitable1, 'Data', {}); %Clear data from uitable
+        end
+
+        % Menu selected function: ClearGraphMenu
+        function ClearGraphMenuSelected(app, event)
+            cla(app.axes1, 'reset'); %Clear graph
+        end
+
+        % Menu selected function: PrintPreviewMenu
+        function PrintPreviewMenuSelected(app, event)
+            printpreview;
+        end
+
+        % Callback function: MaximizeMenu, figure1
+        function MaximizeMenuSelected(app, event)
+            app.figure1.WindowState = 'maximized'; %Maximized app window
+        end
+
+        % Menu selected function: MinimizeMenu
+        function MinimizeMenuSelected(app, event)
+            app.figure1.WindowState = 'minimized'; %Minimized app window
+        end
+
+        % Button pushed function: FilterTimeButton
+        function FilterTimeButtonPushed(app, event)
+            T = getappdata(app.uitable1, 'Data'); %Get data from a UI, data have cell array format
+            nFiles = getappdata(0,'figure'); %Get number of files from figure
+            if(nFiles>0)
+                for ii=1:nFiles
+                    table = vertcat(T{ii}); %Read table that is in cell array
+                    table.time = datetime(table.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                    TT = table2timetable(table); %Convert table to timetable
+                    filterdate1 = app.DatestartEditField.Value; %Get value from EditField
+                    DateStart = datetime(filterdate1, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+                    filtertime1 = app.TimestartEditField.Value; %Get value from EditField
+                    TimeStart = duration(filtertime1,'Format','hh:mm'); %Convert data from EditField to duration of time
+                    EditField1 = DateStart + TimeStart; %Merge date and time
+                    
+                    filterdate2 = app.DateendEditField.Value; %Get value from EditField
+                    DateEnd = datetime(filterdate2, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+                    filtertime2 = app.TimeendEditField.Value; %Get value from EditField
+                    TimeEnd = duration(filtertime2,'Format','hh:mm'); %Convert data from EditField to duration of time
+                    EditField2 = DateEnd + TimeEnd; %Merge date and time
+                    
+                    tf = isbetween(TT.time,EditField1,EditField2); %It contains logical array where 1 indicates the time that remains
+                    %Remember which data was delete in current file
+                    k = 1; %Initialization
+                    RowstoDel = [0 0]; %Initialization
+                    for i = 1:length(tf)
+                        if tf (i,1) == 0 %If row where is logical array 0 remember that row
+                            RowstoDel(1,k) = i;
+                            k = k + 1;
+                        end
+                    end
+                    
+                    table(RowstoDel,:) = [];
+                    storeTable{ii} = {table};
+                    C = horzcat(storeTable{:});
+                    %Delete data in table
+                    storeData{ii} = {tf(:)}; %Store each data in cell array
+                    D = vertcat(storeData{:}); %Store data vertically
+                    dataCompare = cell2mat(D); %Convert data from cell array back to logical array
+                    k = 1; %Initialization
+                    RowstoDel = [0 0]; %Initialization
+                    for i = 1:length(dataCompare)
+                        if dataCompare (i,1) == 0 %If row where is logical array 0 remember that row
+                            RowstoDel(1,k) = i;
+                            k = k + 1;
+                        end
+                    end
+                    setappdata(app.uitable1,'Data',C);
+                end
+            else
+                
+                T.time = datetime(T.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                TT = table2timetable(T); %Convert table to timetable
+                filterdate1 = app.DatestartEditField.Value; %Get value from EditField
+                DateStart = datetime(filterdate1, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+                filtertime1 = app.TimestartEditField.Value; %Get value from EditField
+                TimeStart = duration(filtertime1,'Format','hh:mm'); %Convert data from EditField to duration of time
+                EditField1 = DateStart + TimeStart; %Merge date and time
+                
+                filterdate2 = app.DateendEditField.Value; %Get value from EditField
+                DateEnd = datetime(filterdate2, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+                filtertime2 = app.TimeendEditField.Value; %Get value from EditField
+                TimeEnd = duration(filtertime2,'Format','hh:mm'); %Convert data from EditField to duration of time
+                EditField2 = DateEnd + TimeEnd; %Merge date and time
+                
+                tf = isbetween(TT.time,EditField1,EditField2);  %It contains logical array where 1 indicates the time that remains
+                k = 1; %Initialization
+                RowstoDel = [0 0]; %Initialization
+                for i = 1:length(tf)
+                    if tf (i,1) == 0
+                        RowstoDel(1,k) = i; %If row where is logical array 0 remember that row
+                        k = k + 1;
+                    end
+                end
+            end
+            app.uitable1.Data(RowstoDel,:) = []; %Delete rows which include specified time
+            tableData = get(app.uitable1, 'data'); %For one file
+            setappdata(0,'table',tableData);
+        end
+
+        % Button pushed function: DeleteButton
+        function DeleteButtonPushed(app, event)
+            cn = app.ColumnnumberEditField.Value; %Get value from EditField
+            NumberOfColumn = str2double(cn); %Convert char array to number
+            tableData = get(app.uitable1, 'data'); %Get actual data from table
+            TableNumColumn = size(tableData,2); %Number of columns in table
+            if NumberOfColumn <= TableNumColumn
+                app.uitable1.Data(:,NumberOfColumn) = []; %Delete all rows in selected column
+                app.uitable1.ColumnName(NumberOfColumn,:) = [];
+            else
+                disp('Error'); %Show error in command window
+                questdlg('Cannot delete the requested column because the table does not contain it.',...
+                    'Debugger Error',...
+                    'OK', 'OK');
+                return;
+            end
+        end
+
+        % Button pushed function: ExcelButton
+        function ExcelButtonPushed(app, event)
+            %Open file selection in dialog box
+            [filename,path] = uigetfile(...
+                {'*.xls; *.xlsx', 'Microsoft Excel file (*.xls, *.xlsx)'}, 'Load File', 'MultiSelect', 'on');
+            
+            opt = detectImportOptions(fullfile(path,filename),'NumHeaderLines',4); %Skip headerlines
+            isGoodCol = find(cellfun(@isempty,regexp(opt.SelectedVariableNames,'Var*'))); %Find defined variable names
+            opt.SelectedVariableNames = opt.SelectedVariableNames(isGoodCol); % Import only those columns
+            T = readtable(fullfile(path,filename),opt);
+            [h,m,s] = hms(datetime(T.TIME_,"ConvertFrom",'excel')); %Convert time from Excel
+            T.DATE_ = dateshift(fillmissing(T.DATE_,'previous'),'start','day'); %Get beginning of day
+            T.DATE_ = T.DATE_+duration(h,m,s); %And add time
+            T.TIME_ = []; %Now superfluous
+            app.UITable.ColumnName = T.Properties.VariableNames; %Set ColumnName in uitable from file
+            app.UITable.Data = T; %Show data in UItable
+            setappdata(app.UITable,'Data',T);
+        end
+
+        % Button pushed function: FilterTimeExcelButton
+        function FilterTimeExcelButtonPushed(app, event)
+            T2 = getappdata(app.UITable, 'Data');
+            TT = table2timetable(T2); %Convert table to timetable
+            filterdate1 = app.DatestartEditField.Value; %Get value from EditField
+            DateStart = datetime(filterdate1, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+            filtertime1 = app.TimestartEditField.Value; %Get value from EditField
+            TimeStart = duration(filtertime1,'Format','hh:mm'); %Convert data from EditField to duration of time
+            EditField1 = DateStart + TimeStart; %Merge date and time
+            
+            filterdate2 = app.DateendEditField.Value; %Get value from EditField
+            DateEnd = datetime(filterdate2, 'InputFormat','dd.MM', 'Format', 'dd.MM HH:mm'); %Convert data from EditField to datetime
+            filtertime2 = app.TimeendEditField.Value; %Get value from EditField
+            TimeEnd = duration(filtertime2,'Format','hh:mm'); %Convert data from EditField to duration of time
+            EditField2 = DateEnd + TimeEnd; %Merge date and time
+            
+            tf = isbetween(TT.DATE_,EditField1,EditField2);  %It contains logical array where 1 indicates the time that remains
+            k = 1; %Initialization
+            RowstoDel = [0 0]; %Initialization
+            for i = 1:length(tf)
+                if tf (i,1) == 0
+                    RowstoDel(1,k) = i; %If row where is logical array 0 remember that row
+                    k = k + 1;
+                end
+            end
+            app.UITable.Data(RowstoDel,:) = []; %Delete rows which include specified time
+            tableData = get(app.UITable, 'data');
+            setappdata(app.UITable,'Data',tableData);
+        end
+
+        % Button pushed function: FilterrowsButton
+        function FilterrowsButtonPushed(app, event)
+            tableData = app.uitable1.Data; %Read actual data from table, data have table format
+            numberofrows = app.NumbofrowstodelEditField.Value;
+            filterrows = str2double(numberofrows);
+            newT = tableData(1:filterrows:end,:);
+            app.uitable1.Data = newT;
+            setappdata(0,'table',tableData);
+        end
+
+        % Menu selected function: AveragedatabyhourMenu
+        function AveragedatabyhourMenuSelected(app, event)
+            T = getappdata(app.uitable1, 'Data'); %Get data from a UI, data have cell array format
+            nFiles = getappdata(0,'figure'); %Get number of files from figure
+            filename = getappdata(0, 'Text'); %Take filename
+            
+            if(nFiles>0)
+                for ii=1:nFiles
+                    FileName = cell2mat(filename(ii)); %Convert from cell array where is a char, now is only char
+                    [~,fileName,~] = fileparts(FileName); %Take away file extension
+                    filename{1,ii} = fileName; %Store data in cell array
+                    tableTitle = filename{1,ii}(1:end); %Read first cell array till end
+                    
+                    convertChar = convertCharsToStrings(tableTitle);
+                    table = vertcat(T{ii}); %Read table that is in cell array
+                    table.time = datetime(table.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                    
+                    startValue = app.TimestartEditField.Value;
+                    startTime = str2double(startValue);
+                    endValue = app.TimeendEditField.Value;
+                    endTime = str2double(endValue);
+                    
+                    idx = (table.time.Hour >= startTime) & (table.time.Hour) < endTime;
+                    T2 = table(idx,:);
+                    output = retime(table2timetable(T2), 'daily', 'mean'); %Avarage data
+                    outputTable = timetable2table(output);
+                    tableFilename = addvars(outputTable, repmat(convertChar, height(outputTable),1),'Before','time','NewVariableNames', 'filename'); %Put new variable name "filename"                    store{ii} = tableFilename;
+                    
+                    store{ii} = tableFilename;
+                    n = length(store); %Count how many files was opened
+                    data = vertcat(store{:}); %Concatenate arrays vertically, it is table
+                    
+                    writetable(data,'test.txt');
+                    writetable(data,'test.xls');
+                end
+            else
+                T.time = datetime(T.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                
+                startValue = app.TimestartEditField.Value;
+                startTime = str2double(startValue);
+                endValue = app.TimeendEditField.Value;
+                endTime = str2double(endValue);
+                
+                idx = (T.time.Hour >= startTime) & (T.time.Hour) < endTime;
+                T2 = T(idx,:);
+                output = retime(table2timetable(T2), 'daily', 'mean'); %Avarage data
+                outputTable = timetable2table(output);
+                
+                [~,fileName,~] = fileparts(filename); %Take away file extension
+                convertChar = convertCharsToStrings(fileName);
+                
+                tableFilename = addvars(outputTable, repmat(convertChar, height(outputTable),1),'Before','time','NewVariableNames', 'filename'); %Put new variable name "filename"
+                writetable(tableFilename,'test.txt');
+                writetable(tableFilename,'test.xls');
+            end
+        end
+
+        % Menu selected function: AveragetemperaturebyhourMenu
+        function AveragetemperaturebyhourMenuSelected(app, event)
+            T2 = getappdata(app.UITable, 'Data');
+            TT = table2timetable(T2); %Convert table to timetable
+            
+            filtertime1 = app.TimestartEditField.Value; %Get value from EditField
+            TimeStart = duration(filtertime1,'Format','hh:mm'); %Convert data from EditField to duration of time
+            
+            filtertime2 = app.TimeendEditField.Value; %Get value from EditField
+            TimeEnd = duration(filtertime2,'Format','hh:mm'); %Convert data from EditField to duration of time
+            
+            pickStartTime = TT.DATE_(:);
+            timeStartExcel = timeofday(pickStartTime);
+            
+            idx = (timeStartExcel >= TimeStart) & (timeStartExcel < TimeEnd);
+            T2 = TT(idx,:);
+            
+            output = retime(T2, 'daily', 'mean'); %Avarage data
+            outputTable = timetable2table(output)
+            
+            writetable(outputTable,'temperature.txt');
+            writetable(outputTable,'temperature.xls');
+            
+        end
+
+        % Menu selected function: SametemperatureMenu
+        function SametemperatureMenuSelected(app, event)
+            T2 = getappdata(app.UITable, 'Data');
+            TT = table2timetable(T2); %Convert table to timetable
+            
+            filtertime1 = app.TimestartEditField.Value; %Get value from EditField
+            TimeStart = duration(filtertime1,'Format','hh:mm'); %Convert data from EditField to duration of time
+            
+            filtertime2 = app.TimeendEditField.Value; %Get value from EditField
+            TimeEnd = duration(filtertime2,'Format','hh:mm'); %Convert data from EditField to duration of time
+            
+            pickStartTime = TT.DATE_(:);
+            timeStartExcel = timeofday(pickStartTime);
+            
+            idx = (timeStartExcel >= TimeStart) & (timeStartExcel < TimeEnd);
+            T2 = TT(idx,:);
+            
+            h = unique(T2.DATE_.Day); %Find unique days
+            c = cell(length(h),1); %Set length by days
+            for i = 1:length(c)
+                c{i} = T2(T2.DATE_.Day == h(i),:); %All data is in cell array {84x8 timetable}
+                separateTables = c{i,:}; %Concatenate data
+                [C,IA,IC] = unique(separateTables.M01__C); %Find unique temperature
+                separateTemperature{i} = separateTables(IA,:); %All data in cell array {3x8 timetable}
+            end
+            
+            DayCount = length(separateTemperature);
+            allDays = vertcat(separateTemperature{1,:});
+            G = groupcounts(allDays,'M01__C')
+            
+            maxVal = max(G.GroupCount);
+            idx = find(G.GroupCount == maxVal);
+            allTemp = G(idx,:)
+            fprintf('Počet dní se shodnou teplotou: %d z celkového počtu dnů: %d', maxVal, DayCount)
+            
+            for j = 1:height(allTemp)
+                showDays = find(allDays.M01__C == allTemp.M01__C(j,1));
+                T{j} = allDays(showDays,:);
+            end
+            sameDays = vertcat(T{1,:}); %Timetable
+            
+            for k = 1:height(allTemp)
+                showDays = find(T2.M01__C == allTemp.M01__C(k,1));
+                T{k} = T2(showDays,:);
+            end
+            sameTemp = vertcat(T{1,:});
+            TsameTemp = timetable2table(sameTemp);
+            TsameTemp.DATE_ = datetime(TsameTemp.DATE_,'Format','dd-MM-uuuu hh:mm');
+            result1 = dateshift(TsameTemp.DATE_, 'start', 'minute', 'nearest'); %Datetime only
+            
+            T = getappdata(app.uitable1, 'Data'); %Get data from a UI, data have cell array format
+            nFiles = getappdata(0,'figure'); %Get number of files from figure
+            filename = getappdata(0, 'Text'); %Take filename
+            
+            for ii=1:nFiles
+                FileName = cell2mat(filename(ii)); %Convert from cell array where is a char, now is only char
+                [~,fileName,~] = fileparts(FileName); %Take away file extension
+                filename{1,ii} = fileName; %Store data in cell array
+                tableTitle = filename{1,ii}(1:end); %Read first cell array till end
+                convertChar = convertCharsToStrings(tableTitle);
+                
+                table = vertcat(T{ii}); %Read table that is in cell array
+                table.time = datetime(table.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+                table.time = datetime(table.time,'Format','dd-MM-uuuu HH:mm');
+                result2 = dateshift(table.time, 'start', 'minute', 'nearest');
+                for l = 1:height(TsameTemp)
+                    findData = find(result2 == result1(l,1));
+                    tableData{l} = table(findData,:);
+                end
+                extractData = vertcat(tableData{1,:});
+                timeT = table2timetable(extractData);
+                output = retime(timeT, 'daily', 'mean') %Avarage data
+                outputTable = timetable2table(output);
+                
+                tableVar = timetable2table(sameDays);
+                tableVar.DATE_ = datetime(tableVar.DATE_,'Format','dd-MM-uuuu');
+                dayVar1 = dateshift(tableVar.DATE_, 'start', 'day');
+                RowIdx = find(ismember(dayVar1, outputTable.time,'rows'));
+                
+                if isempty(RowIdx)
+                    tempVar = 0;
+                else
+                    takeTemp = RowIdx(1,1);
+                    tempVar = tableVar.M01__C(takeTemp,1);
+                end
+                
+                tableFilename = addvars(outputTable, repmat(convertChar, height(outputTable),1),'Before','time','NewVariableNames', 'filename'); %Put new variable name "filename"                    store{ii} = tableFilename
+                tableFilename2 = addvars(tableFilename, repmat(tempVar, height(tableFilename),1),'Before','avg','NewVariableNames', 'temperature');
+                
+                store{ii} = tableFilename2;
+                n = length(store); %Count how many files was opened
+                data = vertcat(store{:}); %Concatenate arrays vertically, it is table
+                
+                writetable(data,'test.txt')
+                writetable(data,'test.xls')
+            end
+        end
+
+        % Menu selected function: GraphthesisMenu
+        function GraphthesisMenuSelected(app, event)
+            
+            filename = getappdata(0, 'Text'); %Take filename for set legend
+            tableData = app.uitable1.Data; %Read actual data from table, data have table format
+            T = getappdata(app.uitable1,'Data');
+            
+            %Line color
+            %'#0072BD' blue, '#D95319' orange, '#EDB120' yellow, '#7E2F8E' violet,
+            %'#77AC30' green, '#4DBEEE' blue, '#A2142F' red
+            %cla(app.axes1, 'reset'); %Clear graph before plot something new
+            
+            %Gabionová konstrukce s vyztuženou zeminou SO 213, km 1,500
+            app.axes1.Title.String = 'FBG snímač v tlakové komoře'; %Set title of graph
+            app.axes1.XLabel.String = 'Date time'; %Set xAxis name
+            app.axes1.XGrid = 'on'; %Set xGrid
+            app.axes1.XMinorGrid = 'on'; %Set finer xGrid
+            app.axes1.YGrid = 'on'; %Set yGrid
+            app.axes1.YMinorGrid = 'on'; %Set finer yGrid
+            
+            
+            [~,legendTitle,~] = fileparts(filename); %Take away file extension
+            tableData.time = datetime(tableData.time,'Format','dd-MM-uuuu HH:mm:ss.SSSSSS'); %Convert from char to time
+            TT = table2timetable(tableData); %Convert table to timetable
+            %yyaxis(app.axes1, 'left'); %Set yAxis on the left side
+            app.axes1.YLabel.String = '\mu\epsilon(\mum/m)'; %Set yAxis name on the left side
+            %ylim(app.axes1, [-100 100]) %Set yAxis limit on the left side
+            %app.axes1.YColor = '#D95319'; %Set yData color on the left side
+            %app.axes1.LineStyleOrder = '-'; %Set type of line for data on the left side
+            plot(app.axes1,TT.time,TT.current,'Color','#D95319'); %Plot data
+            %#0072BD Teplota
+            %#D95319 Data
+            legend(app.axes1,'FBG snímač') %Set legend name
+            
+            % brush on;
+        end
+
+        % Menu selected function: GraphpressureMenu
+        function GraphpressureMenuSelected(app, event)
+            %Open file selection in dialog box
+            [filename,path] = uigetfile(...
+                {'*.xls; *.xlsx', 'Microsoft Excel file (*.xls, *.xlsx)'}, 'Load File', 'MultiSelect', 'on');
+            
+            opt = detectImportOptions(fullfile(path,filename),'NumHeaderLines',4); %Skip headerlines
+            isGoodCol = find(cellfun(@isempty,regexp(opt.SelectedVariableNames,'Var*'))); %Find defined variable names
+            opt.SelectedVariableNames = opt.SelectedVariableNames(isGoodCol); % Import only those columns
+            T = readtable(fullfile(path,filename),opt);
+            [h,m,s] = hms(datetime(T.TIME_,"ConvertFrom",'excel')); %Convert time from Excel
+            T.DATE_ = dateshift(fillmissing(T.DATE_,'previous'),'start','day'); %Get beginning of day
+            T.DATE_ = T.DATE_+duration(h,m,s); %And add time
+            T.TIME_ = []; %Now superfluous
+            app.UITable.ColumnName = T.Properties.VariableNames; %Set ColumnName in uitable from file
+            app.UITable.Data = T; %Show data in UItable
+            setappdata(app.UITable,'Data',T);
+            
+            Excel = app.UITable.Data;
+            app.axes1.Title.String = 'FBG snímač v tlakové komoře'; %Set title of graph
+            app.axes1.XLabel.String = 'Date time'; %Set xAxis name
+            app.axes1.XGrid = 'on'; %Set xGrid
+            app.axes1.XMinorGrid = 'on'; %Set finer xGrid
+            app.axes1.YGrid = 'on'; %Set yGrid
+            app.axes1.YMinorGrid = 'on'; %Set finer yGrid
+            
+            app.axes1.YLabel.String = 'p[bar]'; %Set yAxis name on the left side
+            plot(app.axes1,Excel.DATE_,Excel.M00__C,'Color','#A2142F'); %Plot data
+            legend(app.axes1,'Tlakový snímač') %Set legend name
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create figure1 and hide until all components are created
+            app.figure1 = uifigure('Visible', 'off');
+            app.figure1.Position = [700 500 1000 900];
+            app.figure1.Name = 'FBG';
+            app.figure1.SizeChangedFcn = createCallbackFcn(app, @MaximizeMenuSelected, true);
+
+            % Create FileMenu_2
+            app.FileMenu_2 = uimenu(app.figure1);
+            app.FileMenu_2.Text = 'File';
+
+            % Create OpenMenu
+            app.OpenMenu = uimenu(app.FileMenu_2);
+            app.OpenMenu.MenuSelectedFcn = createCallbackFcn(app, @OpenMenuSelected, true);
+            app.OpenMenu.Text = 'Open...';
+
+            % Create OpenmultiplefoldersMenu
+            app.OpenmultiplefoldersMenu = uimenu(app.FileMenu_2);
+            app.OpenmultiplefoldersMenu.MenuSelectedFcn = createCallbackFcn(app, @OpenmultiplefoldersMenuSelected, true);
+            app.OpenmultiplefoldersMenu.Text = 'Open multiple folders';
+
+            % Create CloseMenu
+            app.CloseMenu = uimenu(app.FileMenu_2);
+            app.CloseMenu.MenuSelectedFcn = createCallbackFcn(app, @CloseMenuSelected, true);
+            app.CloseMenu.Text = 'Close';
+
+            % Create PrintPreviewMenu
+            app.PrintPreviewMenu = uimenu(app.FileMenu_2);
+            app.PrintPreviewMenu.MenuSelectedFcn = createCallbackFcn(app, @PrintPreviewMenuSelected, true);
+            app.PrintPreviewMenu.Text = 'Print Preview';
+
+            % Create EditMenu
+            app.EditMenu = uimenu(app.figure1);
+            app.EditMenu.Text = 'Edit';
+
+            % Create GenerateGraphMenu
+            app.GenerateGraphMenu = uimenu(app.EditMenu);
+            app.GenerateGraphMenu.MenuSelectedFcn = createCallbackFcn(app, @GenerateGraphMenuSelected, true);
+            app.GenerateGraphMenu.Text = 'Generate Graph';
+
+            % Create ClearTableMenu
+            app.ClearTableMenu = uimenu(app.EditMenu);
+            app.ClearTableMenu.MenuSelectedFcn = createCallbackFcn(app, @ClearTableMenuSelected, true);
+            app.ClearTableMenu.Text = 'Clear Table';
+
+            % Create ClearGraphMenu
+            app.ClearGraphMenu = uimenu(app.EditMenu);
+            app.ClearGraphMenu.MenuSelectedFcn = createCallbackFcn(app, @ClearGraphMenuSelected, true);
+            app.ClearGraphMenu.Text = 'Clear Graph';
+
+            % Create AveragedatabyhourMenu
+            app.AveragedatabyhourMenu = uimenu(app.EditMenu);
+            app.AveragedatabyhourMenu.MenuSelectedFcn = createCallbackFcn(app, @AveragedatabyhourMenuSelected, true);
+            app.AveragedatabyhourMenu.Text = 'Average data by hour';
+
+            % Create AveragetemperaturebyhourMenu
+            app.AveragetemperaturebyhourMenu = uimenu(app.EditMenu);
+            app.AveragetemperaturebyhourMenu.MenuSelectedFcn = createCallbackFcn(app, @AveragetemperaturebyhourMenuSelected, true);
+            app.AveragetemperaturebyhourMenu.Text = 'Average temperature by hour';
+
+            % Create SametemperatureMenu
+            app.SametemperatureMenu = uimenu(app.EditMenu);
+            app.SametemperatureMenu.MenuSelectedFcn = createCallbackFcn(app, @SametemperatureMenuSelected, true);
+            app.SametemperatureMenu.Text = 'Same temperature';
+
+            % Create GraphthesisMenu
+            app.GraphthesisMenu = uimenu(app.EditMenu);
+            app.GraphthesisMenu.MenuSelectedFcn = createCallbackFcn(app, @GraphthesisMenuSelected, true);
+            app.GraphthesisMenu.Text = 'Graph thesis';
+
+            % Create GraphpressureMenu
+            app.GraphpressureMenu = uimenu(app.EditMenu);
+            app.GraphpressureMenu.MenuSelectedFcn = createCallbackFcn(app, @GraphpressureMenuSelected, true);
+            app.GraphpressureMenu.Text = 'Graph pressure';
+
+            % Create WindowMenu
+            app.WindowMenu = uimenu(app.figure1);
+            app.WindowMenu.Text = 'Window';
+
+            % Create MaximizeMenu
+            app.MaximizeMenu = uimenu(app.WindowMenu);
+            app.MaximizeMenu.MenuSelectedFcn = createCallbackFcn(app, @MaximizeMenuSelected, true);
+            app.MaximizeMenu.Text = 'Maximize';
+
+            % Create MinimizeMenu
+            app.MinimizeMenu = uimenu(app.WindowMenu);
+            app.MinimizeMenu.MenuSelectedFcn = createCallbackFcn(app, @MinimizeMenuSelected, true);
+            app.MinimizeMenu.Text = 'Minimize';
+
+            % Create axes1
+            app.axes1 = uiaxes(app.figure1);
+            app.axes1.ColorOrderIndex = 6;
+            app.axes1.LineStyleOrder = {'-'};
+            app.axes1.FontSize = 13;
+            app.axes1.SortMethod = 'depth';
+            app.axes1.NextPlot = 'add';
+            app.axes1.Position = [530 340 460 400];
+
+            % Create uitable1
+            app.uitable1 = uitable(app.figure1);
+            app.uitable1.ColumnName = {''};
+            app.uitable1.FontSize = 11;
+            app.uitable1.Position = [20 340 480 400];
+
+            % Create text2
+            app.text2 = uilabel(app.figure1);
+            app.text2.HorizontalAlignment = 'right';
+            app.text2.VerticalAlignment = 'top';
+            app.text2.FontSize = 11;
+            app.text2.Position = [20 840 70 20];
+            app.text2.Text = 'Path:';
+
+            % Create text3
+            app.text3 = uilabel(app.figure1);
+            app.text3.HorizontalAlignment = 'right';
+            app.text3.VerticalAlignment = 'top';
+            app.text3.FontSize = 11;
+            app.text3.Position = [20 780 70 20];
+            app.text3.Text = 'File name:';
+
+            % Create text4
+            app.text4 = uilabel(app.figure1);
+            app.text4.VerticalAlignment = 'top';
+            app.text4.FontSize = 11;
+            app.text4.Position = [100 810 600 50];
+            app.text4.Text = '';
+
+            % Create text5
+            app.text5 = uilabel(app.figure1);
+            app.text5.VerticalAlignment = 'top';
+            app.text5.FontSize = 11;
+            app.text5.Position = [100 750 600 50];
+            app.text5.Text = '';
+
+            % Create TimestartEditFieldLabel
+            app.TimestartEditFieldLabel = uilabel(app.figure1);
+            app.TimestartEditFieldLabel.HorizontalAlignment = 'right';
+            app.TimestartEditFieldLabel.Position = [64 241 62 22];
+            app.TimestartEditFieldLabel.Text = 'Time start:';
+
+            % Create TimestartEditField
+            app.TimestartEditField = uieditfield(app.figure1, 'text');
+            app.TimestartEditField.Position = [141 241 100 22];
+            app.TimestartEditField.Value = '01:00';
+
+            % Create FilterTimeButton
+            app.FilterTimeButton = uibutton(app.figure1, 'push');
+            app.FilterTimeButton.ButtonPushedFcn = createCallbackFcn(app, @FilterTimeButtonPushed, true);
+            app.FilterTimeButton.Position = [280 274 100 22];
+            app.FilterTimeButton.Text = 'Filter Time';
+
+            % Create DeleteButton
+            app.DeleteButton = uibutton(app.figure1, 'push');
+            app.DeleteButton.ButtonPushedFcn = createCallbackFcn(app, @DeleteButtonPushed, true);
+            app.DeleteButton.Position = [280 307 100 22];
+            app.DeleteButton.Text = 'Delete';
+
+            % Create ColumnnumberLabel
+            app.ColumnnumberLabel = uilabel(app.figure1);
+            app.ColumnnumberLabel.HorizontalAlignment = 'right';
+            app.ColumnnumberLabel.Position = [31 307 95 22];
+            app.ColumnnumberLabel.Text = {'Column number:'; ''};
+
+            % Create ColumnnumberEditField
+            app.ColumnnumberEditField = uieditfield(app.figure1, 'text');
+            app.ColumnnumberEditField.Position = [141 307 100 22];
+
+            % Create TimeendEditFieldLabel
+            app.TimeendEditFieldLabel = uilabel(app.figure1);
+            app.TimeendEditFieldLabel.HorizontalAlignment = 'right';
+            app.TimeendEditFieldLabel.Position = [68 166 58 22];
+            app.TimeendEditFieldLabel.Text = 'Time end:';
+
+            % Create TimeendEditField
+            app.TimeendEditField = uieditfield(app.figure1, 'text');
+            app.TimeendEditField.Position = [141 166 100 22];
+            app.TimeendEditField.Value = '07:00';
+
+            % Create DatestartEditFieldLabel
+            app.DatestartEditFieldLabel = uilabel(app.figure1);
+            app.DatestartEditFieldLabel.HorizontalAlignment = 'right';
+            app.DatestartEditFieldLabel.Position = [66 274 60 22];
+            app.DatestartEditFieldLabel.Text = 'Date start:';
+
+            % Create DatestartEditField
+            app.DatestartEditField = uieditfield(app.figure1, 'text');
+            app.DatestartEditField.Position = [141 274 100 22];
+            app.DatestartEditField.Value = '10.03';
+
+            % Create DateendEditFieldLabel
+            app.DateendEditFieldLabel = uilabel(app.figure1);
+            app.DateendEditFieldLabel.HorizontalAlignment = 'right';
+            app.DateendEditFieldLabel.Position = [68 195 58 22];
+            app.DateendEditFieldLabel.Text = 'Date end:';
+
+            % Create DateendEditField
+            app.DateendEditField = uieditfield(app.figure1, 'text');
+            app.DateendEditField.Position = [141 195 100 22];
+            app.DateendEditField.Value = '10.03';
+
+            % Create ExcelButton
+            app.ExcelButton = uibutton(app.figure1, 'push');
+            app.ExcelButton.ButtonPushedFcn = createCallbackFcn(app, @ExcelButtonPushed, true);
+            app.ExcelButton.Position = [577 307 100 22];
+            app.ExcelButton.Text = 'Excel';
+
+            % Create UITable
+            app.UITable = uitable(app.figure1);
+            app.UITable.ColumnName = {''};
+            app.UITable.RowName = {};
+            app.UITable.Position = [577 113 302 185];
+
+            % Create FilterTimeExcelButton
+            app.FilterTimeExcelButton = uibutton(app.figure1, 'push');
+            app.FilterTimeExcelButton.ButtonPushedFcn = createCallbackFcn(app, @FilterTimeExcelButtonPushed, true);
+            app.FilterTimeExcelButton.Position = [278 240 104 22];
+            app.FilterTimeExcelButton.Text = 'Filter Time Excel';
+
+            % Create FilterrowsButton
+            app.FilterrowsButton = uibutton(app.figure1, 'push');
+            app.FilterrowsButton.ButtonPushedFcn = createCallbackFcn(app, @FilterrowsButtonPushed, true);
+            app.FilterrowsButton.Position = [278 131 104 22];
+            app.FilterrowsButton.Text = 'Filter rows';
+
+            % Create NumbofrowstodelEditFieldLabel
+            app.NumbofrowstodelEditFieldLabel = uilabel(app.figure1);
+            app.NumbofrowstodelEditFieldLabel.HorizontalAlignment = 'right';
+            app.NumbofrowstodelEditFieldLabel.Position = [0 131 125 22];
+            app.NumbofrowstodelEditFieldLabel.Text = 'Numb, of rows to del.:';
+
+            % Create NumbofrowstodelEditField
+            app.NumbofrowstodelEditField = uieditfield(app.figure1, 'text');
+            app.NumbofrowstodelEditField.Position = [140 131 100 22];
+
+            % Show the figure after all components are created
+            app.figure1.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = FBG_App_2
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.figure1)
+
+            % Execute the startup function
+            runStartupFcn(app, @FBG_OpeningFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.figure1)
+        end
+    end
+end
