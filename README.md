@@ -2,7 +2,7 @@
 
 My diploma thesis dealt with geotechnical monitoring, where FBG sensors were used for the first time, to monitor deformations of gabion structures reinforced with tensile networks, which were used to ensure the stability of local roads due to slope movements in the vicinity.
 
-![App window](Figures/Instrumentati.jpg)
+![App window](Figures/Instrumentation.jpg)
 
 ## Why I needed to develop an application
 The goal of developing this application was to facilitate the processing of measurement results, as Microsoft Excel cannot be used for such a large amount of data. Microsoft Excel can process 1 449 576 rows. I needed to work with 54 files for the lower sensors and another 54 files for the upper sensors. There were about 150 000 lines in one file. It is therefore clear that the use of Microsoft Excel would be time consuming, and for this reason an application has been created which can retrieve data from files selected by the user and further work with and analyze this data.
